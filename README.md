@@ -4,6 +4,7 @@ this is where i accurately make AVS Stuff, to try it out using BetaFX Custom Ope
 
 # Kyle's OFX Bundles
 
-I Have 2 OfX Bundles i created for vegas pro
+I Have 2 OfX Bundles i created for vegas pro,
+----------------------------------------------
 1: Color Exchange
 :2 Color Correction
