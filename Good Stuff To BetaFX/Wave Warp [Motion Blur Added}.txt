@@ -1,0 +1,91 @@
+ // kFloat0 : Frequency
+ // kFloat1 : Amplitude (% of image width)
+ // kFloat2 : Phase (degrees)
+ // kFloat3 : Phase Speed (degrees per second)
+ // kFloat4 : Displace Angle (degrees)
+ // kFloat5 : Wave Angle (degrees)
+ // kFloat6 : Edge Mode (0 Clamp, 1 Tile, 2 Mirror, 3 Transparent)
+ // kFloat7 : Motion Blur Strength (try 1.0)
+ // kFloat8 : Motion Blur Samples (try 12)
+ // kFloat9 : Motion Blur Shutter (seconds, try 0.5)
+
+float W = (float)p_Width;
+float H = (float)p_Height;
+
+float wa = kFloat5 * 0.01745329f;
+float da = kFloat4 * 0.01745329f;
+
+float pos = ((float)x * cos(wa) +
+             (float)y * sin(wa)) / W;
+
+float phase = (kFloat2 + kFloat3 * kTime)
+              * 0.01745329f;
+
+float amp = kFloat1 * 0.01f * W;
+
+int mode = (int)(kFloat6 + 0.5f);
+int samples = (int)clamp(kFloat8, 1.0f, 64.0f);
+
+float4 accum = (float4)(0.0f);
+float weightSum = 0.0f;
+
+for (int i = 0; i < samples; i++) {
+
+    float t = samples > 1
+        ? ((float)i / (float)(samples - 1) - 0.5f)
+        : 0.0f;
+
+    // Sample different moments within shutter interval
+    float samplePhase = phase +
+        t * kFloat9 * kFloat7 *
+        kFloat3 * 0.01745329f;
+
+    float wave = sin(
+        6.2831853f * kFloat0 * pos + samplePhase
+    );
+
+    float sx = (float)x + cos(da) * wave * amp;
+    float sy = (float)y + sin(da) * wave * amp;
+
+    float a = 1.0f;
+
+    if (mode == 1) {
+        sx = sx - W * floor(sx / W);
+        sy = sy - H * floor(sy / H);
+    }
+
+    if (mode == 2) {
+        float mx = sx - 2.0f * W *
+                   floor(sx / (2.0f * W));
+        float my = sy - 2.0f * H *
+                   floor(sy / (2.0f * H));
+
+        if (mx >= W) {
+            mx = 2.0f * W - 1.0f - mx;
+        }
+        if (my >= H) {
+            my = 2.0f * H - 1.0f - my;
+        }
+
+        sx = mx;
+        sy = my;
+    }
+
+    if (mode == 3) {
+        if (sx < 0.0f || sx > W - 1.0f ||
+            sy < 0.0f || sy > H - 1.0f) {
+            a = 0.0f;
+        }
+    }
+
+    sx = clamp(sx, 0.0f, W - 1.0f);
+    sy = clamp(sy, 0.0f, H - 1.0f);
+
+    kReadIndex = (float2)(sx, sy);
+    kRead();
+
+    accum += kOutput * a;
+    weightSum += 1.0f;
+}
+
+kOutput = accum / max(weightSum, 1.0f);

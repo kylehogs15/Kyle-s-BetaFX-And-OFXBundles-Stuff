@@ -1,0 +1,59 @@
+float2 center = (float2)(
+    (kFloat0 / 100.0f) * (float)p_Width,
+    (kFloat1 / 100.0f) * (float)p_Height
+);
+
+float2 pixel = (float2)((float)x, (float)y);
+float2 delta = pixel - center;
+
+// Normalize coordinates for circular distortion
+float2 normalized = delta / (float)p_Height;
+
+float radius = length(normalized);
+
+// kFloat3: Swirl Size (0-100)
+// 100 = Huge swirl covering the image
+float swirlRadius =
+    0.05f + (kFloat3 / 100.0f) * 1.45f;
+
+// kFloat2: Swirl Percent (0-100)
+float strength =
+    (kFloat2 / 100.0f) * 6.2831853f;
+
+// Smooth swirl falloff
+float falloff = clamp(
+    1.0f - radius / swirlRadius,
+    0.0f,
+    1.0f
+);
+
+falloff = falloff * falloff *
+          (3.0f - 2.0f * falloff);
+
+float angle = strength * falloff;
+
+// Rotate pixels around swirl center
+float s = sin(angle);
+float c = cos(angle);
+
+float2 rotated = (float2)(
+    normalized.x * c - normalized.y * s,
+    normalized.x * s + normalized.y * c
+);
+
+// Convert back to pixel coordinates
+float2 samplePos =
+    center + rotated * (float)p_Height;
+
+// Keep sampling inside image
+kReadIndex = clamp(
+    samplePos,
+    (float2)(0.0f, 0.0f),
+    (float2)(
+        (float)(p_Width - 1),
+        (float)(p_Height - 1)
+    )
+);
+
+// Output swirled image
+kOutput = kRead();

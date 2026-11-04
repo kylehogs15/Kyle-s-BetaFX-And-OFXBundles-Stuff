@@ -1,0 +1,21 @@
+Color Correction - OFX plug-in for VEGAS Pro (Windows 64-bit)
+
+INSTALL
+1. Close VEGAS Pro.
+2. Copy the whole folder "Color Correction.ofx.bundle" to:
+      C:\Program Files\Common Files\OFX\Plugins\
+   (create the Plugins folder if it does not exist; needs admin rights)
+3. Start VEGAS Pro. Find it in Video FX / OFX plug-ins as "Color Correction".
+
+PARAMETERS (default 0; Hue is -180 to 180, all others -100 to 100)
+  Brightness   +100 = about +40% (+102/255)
+  Temperature  +100 = picture 1 (R+30 G+5 B-20, warm)
+               -100 = picture 2 (R-30 G-5 B+20, purple -> blue)
+               0 = no change
+  Contrast     -100 = half contrast, +100 = threshold (16x gain around mid-grey: pure black/white, matches your picture)
+  Saturation   -100 = greyscale, +100 = double (HSL)
+  Gamma        +100 = x^(1/16), very bright/pastel (matches your picture), -100 = darker (x^2)
+  Hue          -180 to 180 degrees (HSL rotation; 1 unit = 1 degree, same hue cycle as before)
+
+Order applied: Brightness, Temperature, Contrast, Saturation + Hue, Gamma.
+"source" folder holds the C source (build: clang + lld-link, no C runtime).
