@@ -1,0 +1,53 @@
+float omega = clamp(kFloat0, 1.0f, 100.0f);
+float speed = clamp(kFloat1, -1000.0f, 1000.0f);
+float offset = clamp(kFloat2, 0.0f, 100.0f);
+float strength = clamp(kFloat3, 0.0f, 100.0f);
+
+// Image center
+float2 center = (float2)(
+    (float)p_Width * 0.5f,
+    (float)p_Height * 0.5f
+);
+
+// Aspect-correct circular coordinates
+float scale = (float)min(p_Width, p_Height);
+float2 pos = (float2)((float)x, (float)y);
+float2 delta = (pos - center) / scale;
+
+float radius = length(delta);
+float2 direction = delta / fmax(radius, 0.00001f);
+
+// Ripple controls
+float frequency = omega * 0.65f;
+
+// Speed: -1000 to 1000
+float phase = kTime * speed * 0.15f
+            + offset * 0.15f;
+
+// Circular ripple wave
+float wave = sin(
+    radius * frequency * 6.2831853f - phase
+);
+
+// Adjustable ripple strength
+float amplitude = strength * 0.0011f;
+float displacement = wave * amplitude;
+
+// Warp source coordinates
+float2 uv = pos + direction * displacement * scale;
+
+// MIRROR REFLECTION EDGES
+float2 size = (float2)(
+    (float)(p_Width - 1),
+    (float)(p_Height - 1)
+);
+
+float2 period = size * 2.0f;
+
+// Repeat and reflect coordinates
+float2 mirrored = uv - period * floor(uv / period);
+mirrored = size - fabs(mirrored - size);
+
+// Read mirrored source
+kReadIndex = mirrored;
+kRead();

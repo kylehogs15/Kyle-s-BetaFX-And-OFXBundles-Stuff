@@ -1,0 +1,42 @@
+// AVS-style Sphere for BetaFX Custom OpenCL Kernel
+//
+// kFloat0 = degree, slider range -1 .. 10
+//   -1 = slight pinch
+//    0 = no effect (image passes through unchanged)
+//   10 = full sphere (fitted to the reference render)
+//
+// The sphere is the largest ellipse that fits the frame (width and height
+// normalized separately). Inside it, each output pixel at normalized radius r
+// reads the source at radius r^p, with p = 1 + degree * 11/90:
+//   p = 0.878  at degree -1  (pinch)
+//   p = 1      at degree 0   (identity)
+//   p = 20/9   at degree 10  (about 2.22, matches the reference)
+// Pixels outside the ellipse are untouched.
+
+float degree = clamp(kFloat0, -1.0f, 10.0f);
+float p = 1.0f + degree * (11.0f / 90.0f);
+
+float hw = (float)p_Width * 0.5f;
+float hh = (float)p_Height * 0.5f;
+
+// normalized coordinates, -1..1 across the frame
+float dx = ((float)x + 0.5f - hw) / hw;
+float dy = ((float)y + 0.5f - hh) / hh;
+float r = sqrt(dx * dx + dy * dy);
+
+float2 src = (float2)((float)x, (float)y);
+
+if (r < 1.0f) {
+    // source radius = r^p, so the offset is scaled by r^(p-1)
+    float scale = pow(fmax(r, 1e-6f), p - 1.0f);
+
+    src.x = hw + dx * scale * hw - 0.5f;
+    src.y = hh + dy * scale * hh - 0.5f;
+}
+
+// keep sampling inside the image
+src.x = clamp(src.x, 0.0f, (float)(p_Width - 1));
+src.y = clamp(src.y, 0.0f, (float)(p_Height - 1));
+
+kReadIndex = src;
+kRead();

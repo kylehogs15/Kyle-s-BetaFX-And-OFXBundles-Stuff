@@ -1,0 +1,86 @@
+/*
+    AVS Rotate - BetaFX Custom OpenCL
+
+    kFloat1: -1.000 to 1.000
+    -1.000 = -180 degrees
+     0.000 =    0 degrees
+     1.000 =  180 degrees
+
+    Zoom keyframes:
+      0   = 1.000
+      45  = 0.500
+      90  = 0.565
+      135 = 0.500
+      180 = 1.000
+
+    Curve sequence:
+      Slow -> Fast -> Slow -> Fast -> Linear
+*/
+
+float angle = clamp(kFloat1, -1.0f, 1.0f) * 180.0f;
+float a = fabs(angle);
+
+float curve = a / 45.0f;
+int segment = (int)floor(curve);
+float t = curve - (float)segment;
+
+if (segment >= 4)
+{
+    segment = 3;
+    t = 1.0f;
+}
+
+float z1, z2;
+float zoomT;
+
+if (segment == 0)
+{
+    z1 = 1.000f;
+    z2 = 0.500f;
+    zoomT = sqrt(t);               // Slow
+}
+else if (segment == 1)
+{
+    z1 = 0.500f;
+    z2 = 0.565f;
+    zoomT = t * t;                 // Fast
+}
+else if (segment == 2)
+{
+    z1 = 0.565f;
+    z2 = 0.500f;
+    zoomT = sqrt(t);               // Slow
+}
+else
+{
+    z1 = 0.500f;
+    z2 = 1.000f;
+    zoomT = t * t;                 // Fast
+}
+
+float zoom = z1 + (z2 - z1) * zoomT;
+
+float cx = (float)p_Width * 0.5f;
+float cy = (float)p_Height * 0.5f;
+
+float px = (float)x - cx;
+float py = (float)y - cy;
+
+float rad = -angle * 0.01745329252f;
+float c = cos(rad);
+float s = sin(rad);
+
+kReadIndex.x = (c * px - s * py) / zoom + cx;
+kReadIndex.y = (s * px + c * py) / zoom + cy;
+
+if (kReadIndex.x >= 0.0f &&
+    kReadIndex.y >= 0.0f &&
+    kReadIndex.x < (float)p_Width &&
+    kReadIndex.y < (float)p_Height)
+{
+    kRead();
+}
+else
+{
+    kOutput = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+}

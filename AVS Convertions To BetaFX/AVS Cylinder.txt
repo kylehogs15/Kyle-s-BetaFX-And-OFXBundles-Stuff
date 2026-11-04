@@ -1,0 +1,42 @@
+// AVS Cylinder - BetaFX Custom OpenCL Kernel
+//
+// kFloat0 = Center   slider range 0 to 640
+// kFloat1 = Radius   slider range 0 to 640
+// kFloat2 = Degree   slider range -1 to 10   (0 = no change, 2 = default look)
+// kFloat3 = Vertical type 1 = vertical cylinder, 0 = horizontal cylinder
+//
+// Center / Radius are in a 640-wide reference space and are scaled to the
+// real image width, so the same numbers look the same at 640x360, 1280x720, 4K...
+
+float s      = (float)p_Width / 640.0f;
+float center = kFloat0 * s;
+float radius = kFloat1 * s;
+float degree = kFloat2;
+int   vert   = (kFloat3 >= 0.5f);
+
+// position along the cylinder axis (x for horizontal, y for vertical)
+float pos = vert ? (float)y : (float)x;
+
+float srcX = (float)x;
+float srcY = (float)y;
+
+if (radius > 0.0f)
+{
+    float d = pos - center;
+    float t = d / radius;          // -1 .. 1 inside the cylinder
+
+    if (fabs(t) < 1.0f)
+    {
+        // degree >= 0 : exponent 1..11  (magnify the middle)
+        // degree <  0 : exponent 1..0.5 (pinch the middle)
+        float e = (degree >= 0.0f) ? (1.0f + degree) : (1.0f / (1.0f - degree));
+
+        float nt  = copysign(pow(fabs(t), e), t);   // edges stay put, no seam
+        float np  = center + nt * radius;
+
+        if (vert) srcY = np; else srcX = np;
+    }
+}
+
+kReadIndex = (float2)(srcX, srcY);
+kOutput = kRead();
