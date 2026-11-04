@@ -1,7 +1,6 @@
 float omega = clamp(kFloat0, 1.0f, 100.0f);
-float speed = clamp(kFloat1, -1000.0f, 1000.0f);
+float speed = clamp(kFloat1, -100.0f, 100.0f);
 float offset = clamp(kFloat2, 0.0f, 100.0f);
-float strength = clamp(kFloat3, 0.0f, 100.0f);
 
 // Image center
 float2 center = (float2)(
@@ -19,19 +18,17 @@ float2 direction = delta / fmax(radius, 0.00001f);
 
 // Ripple controls
 float frequency = omega * 0.65f;
-
-// Speed: -1000 to 1000
 float phase = kTime * speed * 0.15f
             + offset * 0.15f;
 
-// Circular ripple wave
+// Circular wave
 float wave = sin(
     radius * frequency * 6.2831853f - phase
 );
 
-// Adjustable ripple strength
-float amplitude = strength * 0.0011f;
-float displacement = wave * amplitude;
+// Radial displacement
+float strength = 0.055f;
+float displacement = wave * strength;
 
 // Warp source coordinates
 float2 uv = pos + direction * displacement * scale;
