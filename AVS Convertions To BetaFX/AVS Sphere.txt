@@ -1,37 +1,58 @@
 // AVS-style Sphere for BetaFX Custom OpenCL Kernel
 //
-// kFloat0 = degree, slider range -1 .. 10
-//   -1 = slight pinch
-//    0 = no effect (image passes through unchanged)
-//   10 = full sphere (fitted to the reference render)
+// The sphere is an ellipse inscribed in a box. By default the box is the whole
+// frame. Each edge of the box can be dragged inward on its own, and the whole
+// ellipse can be moved, like the on-screen handles in the reference video.
 //
-// The sphere is the largest ellipse that fits the frame (width and height
-// normalized separately). Inside it, each output pixel at normalized radius r
-// reads the source at radius r^p, with p = 1 + degree * 11/90:
-//   p = 0.878  at degree -1  (pinch)
-//   p = 1      at degree 0   (identity)
-//   p = 20/9   at degree 10  (about 2.22, matches the reference)
-// Pixels outside the ellipse are untouched.
+// kFloat0  degree        -1 .. 10     -1 = slight pinch, 0 = normal, 10 = full sphere
+// kFloat1  zoom          -1 .. 0      0 = full size, -1 = zoomed all the way out
+// kFloat2  left edge     -1 .. 0      0 = at the left of the frame, -1 = dragged to the right edge
+// kFloat3  right edge    -1 .. 0      0 = at the right of the frame, -1 = dragged to the left edge
+// kFloat4  top edge      -1 .. 0      0 = at the top of the frame, -1 = dragged to the bottom edge
+// kFloat5  bottom edge   -1 .. 0      0 = at the bottom of the frame, -1 = dragged to the top edge
+// kFloat6  move X        -100 .. 100  percent of half the width,  - = left, + = right
+// kFloat7  move Y        -100 .. 100  percent of half the height, - = up,   + = down
 
 float degree = clamp(kFloat0, -1.0f, 10.0f);
 float p = 1.0f + degree * (11.0f / 90.0f);
 
+float zoom = 1.0f + clamp(kFloat1, -1.0f, 0.0f);
+
+// box edges in normalized frame units (-1 .. 1, y points down)
+float L = -1.0f - 2.0f * clamp(kFloat2, -1.0f, 0.0f);
+float R =  1.0f + 2.0f * clamp(kFloat3, -1.0f, 0.0f);
+float T = -1.0f - 2.0f * clamp(kFloat4, -1.0f, 0.0f);
+float B =  1.0f + 2.0f * clamp(kFloat5, -1.0f, 0.0f);
+
+// ellipse center and radii, then the move sliders shift the whole thing
+float cxn = 0.5f * (L + R) + clamp(kFloat6, -100.0f, 100.0f) * 0.01f;
+float cyn = 0.5f * (T + B) + clamp(kFloat7, -100.0f, 100.0f) * 0.01f;
+float rxn = 0.5f * (R - L) * zoom;
+float ryn = 0.5f * (B - T) * zoom;
+
+// to pixels
 float hw = (float)p_Width * 0.5f;
 float hh = (float)p_Height * 0.5f;
-
-// normalized coordinates, -1..1 across the frame
-float dx = ((float)x + 0.5f - hw) / hw;
-float dy = ((float)y + 0.5f - hh) / hh;
-float r = sqrt(dx * dx + dy * dy);
+float cx = hw + cxn * hw;
+float cy = hh + cyn * hh;
+float rx = rxn * hw;
+float ry = ryn * hh;
 
 float2 src = (float2)((float)x, (float)y);
 
-if (r < 1.0f) {
-    // source radius = r^p, so the offset is scaled by r^(p-1)
-    float scale = pow(fmax(r, 1e-6f), p - 1.0f);
+// a fully collapsed ellipse has no effect
+if (rx > 0.5f && ry > 0.5f) {
+    float nx = ((float)x + 0.5f - cx) / rx;
+    float ny = ((float)y + 0.5f - cy) / ry;
+    float r = sqrt(nx * nx + ny * ny);
 
-    src.x = hw + dx * scale * hw - 0.5f;
-    src.y = hh + dy * scale * hh - 0.5f;
+    if (r < 1.0f) {
+        // source radius = r^p, so the offset is scaled by r^(p-1)
+        float scale = pow(fmax(r, 1e-6f), p - 1.0f);
+
+        src.x = cx + nx * scale * rx - 0.5f;
+        src.y = cy + ny * scale * ry - 0.5f;
+    }
 }
 
 // keep sampling inside the image
