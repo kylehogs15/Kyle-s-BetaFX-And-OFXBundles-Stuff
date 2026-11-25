@@ -1,0 +1,35 @@
+// BetaFX custom kernel: "2 X Sound Like Green Splaat"
+// kFloat0 = progress, 0 -> 1  (0 = untouched image, 1 = flat purple)
+// Keyframe the kFloat0 slider from 0 to 1 over the length of the transition.
+// Optional: kFloat1 = uniform zoom of the fading backdrop (leave at 0 for the default 1.0 = no zoom).
+
+float t  = clamp(kFloat0, 0.0f, 1.0f);
+float W  = (float)p_Width;
+float H  = (float)p_Height;
+float px = (float)x + 0.5f;
+
+// Seam sweeps from the right edge (t=0) to the left edge (t=1)
+float seam = W * (1.0f - t);
+
+// Fill colour the backdrop fades into
+float4 purple = (float4)(0.40f, 0.40f, 0.60f, 1.0f);
+
+if (px < seam)
+{
+    // LEFT: the whole picture squeezed horizontally into [0, seam]
+    kReadIndex = (float2)((px / seam) * W, (float)y);
+    kRead();
+}
+else
+{
+    // RIGHT: undistorted copy of the picture (optionally zoomed about the frame centre), fading to purple
+    float zoom = (kFloat1 > 0.0f) ? kFloat1 : 1.0f;
+    kReadIndex = (float2)(0.5f * W + (px - 0.5f * W) / zoom,
+                          0.5f * H + (((float)y + 0.5f) - 0.5f * H) / zoom);
+    kRead();
+
+    float fade = t * t * (3.0f - 2.0f * t);   // smoothstep
+    kOutput = mix(kOutput, purple, fade);
+}
+
+kOutput.w = 1.0f;
