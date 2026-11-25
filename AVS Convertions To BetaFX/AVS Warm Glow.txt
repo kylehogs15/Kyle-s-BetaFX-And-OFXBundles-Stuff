@@ -1,0 +1,54 @@
+// AVS Warm Glow By KyleHogs
+// BetaFX Custom OpenCL Kernel (v4: heavy blur layer composited over the original with Darken)
+//
+// Layer 2 (bottom) = original image
+// Layer 1 (top)    = very large blur of the image, Compositing Mode: Darken, Level 100%
+// Result           = per-channel minimum of the two
+//
+// kFloat0 = Glow Level (blur size), slider range 1 to 100, default 50
+// (set the slider to Min 1 / Max 100 / Default 50 below the code box)
+// 50 = the blur size of the reference, 100 = twice as big, 1 = almost no blur.
+
+float level = clamp(kFloat0, 1.0f, 100.0f);
+
+// Original pixel (layer 2)
+kReadIndex = (float2)((float)x, (float)y);
+kRead();
+float4 orig = kOutput;
+
+// Blur size scales with the image width so it looks the same at any resolution
+float sigma = (float)p_Width * 0.045f * (level / 50.0f);
+
+// Per-pixel random rotation so the sampling pattern turns into fine noise, not rings
+float h = sin(dot((float2)((float)x, (float)y), (float2)(12.9898f, 78.233f))) * 43758.5453f;
+h = h - floor(h);
+float rot = h * 6.2831853f;
+
+// Large gaussian blur (layer 1): 128 gaussian-distributed samples, equal weight
+float4 acc = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+for (int i = 0; i < 128; i++)
+{
+    float u = (((float)i + 0.5f) / 128.0f) * 0.998f;
+    float rr = sigma * sqrt(-2.0f * log(1.0f - u));
+    float th = (float)i * 2.399963f + rot;
+
+    float sx = clamp((float)x + cos(th) * rr, 0.0f, (float)(p_Width - 1));
+    float sy = clamp((float)y + sin(th) * rr, 0.0f, (float)(p_Height - 1));
+
+    kReadIndex = (float2)(sx, sy);
+    kRead();
+    acc += kOutput;
+}
+float4 blur = acc / 128.0f;
+
+// Darken at 100%: per-channel minimum of the blurred layer and the original
+float3 res = (float3)(fmin(blur.x, orig.x), fmin(blur.y, orig.y), fmin(blur.z, orig.z));
+
+// Whiten the yellow: lift blue towards the red/green level, only where the pixel is yellow.
+// whiten = 0.0 keeps the yellow as it was, 1.0 makes it fully neutral white/grey.
+// Brightness stays the same or goes up a little, it is never darkened.
+float whiten = 0.8f;
+float yellow = fmax(fmin(res.x, res.y) - res.z, 0.0f);
+res.z = res.z + yellow * whiten;
+
+kOutput = (float4)(res.x, res.y, res.z, orig.w);
